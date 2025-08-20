@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Download, Calendar, BarChart3, PieChart, TrendingUp } from 'lucide-react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable'; // <-- MUDANÇA 1: Importar 'autoTable' diretamente.
 import { getTickets, getUsers, getCategories } from '../../utils/api';
 import { Ticket, User, Category } from '../../types';
-import { formatDate, calculateResolutionTime } from '../../utils/helpers';
+import { formatDate, calculateResolutionTime, getStatusLabel, getPriorityLabel } from '../../utils/helpers';
 
 export default function Reports() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
@@ -51,22 +53,19 @@ export default function Reports() {
     const resolvedTickets = filteredTickets.filter(t => t.status === 'resolved').length;
     const resolutionRate = totalTickets > 0 ? (resolvedTickets / totalTickets) * 100 : 0;
 
-    // Average resolution time
     const resolvedTicketsWithTime = filteredTickets.filter(t => t.resolvedAt);
-    const avgResolutionTime = resolvedTicketsWithTime.length > 0 
+    const avgResolutionTime = resolvedTicketsWithTime.length > 0
       ? resolvedTicketsWithTime.reduce((acc, ticket) => {
           return acc + calculateResolutionTime(ticket.createdAt, ticket.resolvedAt);
         }, 0) / resolvedTicketsWithTime.length
       : 0;
 
-    // Tickets by category
     const ticketsByCategory = categories.map(category => ({
       name: category.name,
       count: filteredTickets.filter(t => t.category === category.id).length,
       color: category.color
     }));
 
-    // Tickets by priority
     const ticketsByPriority = [
       { name: 'Baixa', count: filteredTickets.filter(t => t.priority === 'low').length, color: '#10b981' },
       { name: 'Média', count: filteredTickets.filter(t => t.priority === 'medium').length, color: '#f59e0b' },
@@ -74,14 +73,12 @@ export default function Reports() {
       { name: 'Crítica', count: filteredTickets.filter(t => t.priority === 'critical').length, color: '#ef4444' },
     ];
 
-    // Tickets by technician
     const technicians = users.filter(u => u.role === 'technician');
     const ticketsByTechnician = technicians.map(tech => ({
       name: tech.name,
       count: filteredTickets.filter(t => t.assignedTo === tech.id).length
     }));
 
-    // Tickets by status
     const ticketsByStatus = [
       { name: 'Aberto', count: filteredTickets.filter(t => t.status === 'open').length, color: '#3b82f6' },
       { name: 'Em Andamento', count: filteredTickets.filter(t => t.status === 'in_progress').length, color: '#8b5cf6' },
@@ -103,20 +100,37 @@ export default function Reports() {
   };
 
   const exportToPDF = () => {
-    // In a real application, you would use a library like jsPDF or similar
-    const stats = generateStats();
-    const reportData = {
-      period: `${formatDate(dateRange.start + 'T00:00:00Z')} - ${formatDate(dateRange.end + 'T23:59:59Z')}`,
-      stats,
-      tickets: filteredTickets
-    };
+    const doc = new jsPDF();
     
-    console.log('Exporting to PDF:', reportData);
-    alert('Funcionalidade de exportação PDF será implementada em breve!');
+    doc.text('Relatório de Chamados', 14, 16);
+    doc.setFontSize(10);
+    doc.text(`Período: ${formatDate(dateRange.start + 'T00:00:00Z')} - ${formatDate(dateRange.end + 'T23:59:59Z')}`, 14, 22);
+
+    const tableData = filteredTickets.map(ticket => {
+        const user = users.find(u => u.id === ticket.userId);
+        const category = categories.find(c => c.id === ticket.category);
+        return [
+          ticket.id,
+          ticket.title,
+          getStatusLabel(ticket.status),
+          getPriorityLabel(ticket.priority),
+          category?.name || '',
+          user?.name || '',
+          formatDate(ticket.createdAt)
+        ];
+    });
+
+    // <-- MUDANÇA 2: Usar 'autoTable' como uma função que recebe 'doc'.
+    autoTable(doc, {
+        startY: 30,
+        head: [['ID', 'Título', 'Status', 'Prioridade', 'Categoria', 'Usuário', 'Criado em']],
+        body: tableData,
+    });
+    
+    doc.save(`relatorio_chamados_${dateRange.start}_${dateRange.end}.pdf`);
   };
 
   const exportToExcel = () => {
-    // In a real application, you would use a library like xlsx or similar
     const csvContent = [
       ['ID', 'Título', 'Status', 'Prioridade', 'Categoria', 'Usuário', 'Criado em', 'Resolvido em'].join(','),
       ...filteredTickets.map(ticket => {
@@ -124,19 +138,19 @@ export default function Reports() {
         const category = categories.find(c => c.id === ticket.category);
         
         return [
-          ticket.id,
-          `"${ticket.title}"`,
-          ticket.status,
-          ticket.priority,
-          category?.name || '',
-          user?.name || '',
+          `"${ticket.id}"`,
+          `"${ticket.title.replace(/"/g, '""')}"`,
+          getStatusLabel(ticket.status),
+          getPriorityLabel(ticket.priority),
+          `"${category?.name || ''}"`,
+          `"${user?.name || ''}"`,
           formatDate(ticket.createdAt),
           ticket.resolvedAt ? formatDate(ticket.resolvedAt) : ''
         ].join(',');
       })
     ].join('\n');
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob([`\uFEFF${csvContent}`], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
@@ -256,7 +270,7 @@ export default function Reports() {
               <div key={index} className="space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
-                    <div 
+                    <div
                       className="w-3 h-3 rounded-full"
                       style={{ backgroundColor: category.color }}
                     />
@@ -271,7 +285,7 @@ export default function Reports() {
                 <div className="w-full bg-gray-200 rounded-full h-2">
                   <div
                     className="h-2 rounded-full transition-all duration-300"
-                    style={{ 
+                    style={{
                       backgroundColor: category.color,
                       width: `${stats.totalTickets > 0 ? (category.count / stats.totalTickets) * 100 : 0}%`
                     }}
@@ -290,7 +304,7 @@ export default function Reports() {
               <div key={index} className="space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
-                    <div 
+                    <div
                       className="w-3 h-3 rounded-full"
                       style={{ backgroundColor: status.color }}
                     />
@@ -305,7 +319,7 @@ export default function Reports() {
                 <div className="w-full bg-gray-200 rounded-full h-2">
                   <div
                     className="h-2 rounded-full transition-all duration-300"
-                    style={{ 
+                    style={{
                       backgroundColor: status.color,
                       width: `${stats.totalTickets > 0 ? (status.count / stats.totalTickets) * 100 : 0}%`
                     }}
@@ -324,7 +338,7 @@ export default function Reports() {
               <div key={index} className="space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
-                    <div 
+                    <div
                       className="w-3 h-3 rounded-full"
                       style={{ backgroundColor: priority.color }}
                     />
@@ -339,7 +353,7 @@ export default function Reports() {
                 <div className="w-full bg-gray-200 rounded-full h-2">
                   <div
                     className="h-2 rounded-full transition-all duration-300"
-                    style={{ 
+                    style={{
                       backgroundColor: priority.color,
                       width: `${stats.totalTickets > 0 ? (priority.count / stats.totalTickets) * 100 : 0}%`
                     }}
@@ -367,7 +381,7 @@ export default function Reports() {
                 <div className="w-full bg-gray-200 rounded-full h-2">
                   <div
                     className="h-2 rounded-full bg-blue-600 transition-all duration-300"
-                    style={{ 
+                    style={{
                       width: `${stats.totalTickets > 0 ? (technician.count / stats.totalTickets) * 100 : 0}%`
                     }}
                   />
