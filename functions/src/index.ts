@@ -1,5 +1,6 @@
+import * as functions from "firebase-functions";
 import dotenv from 'dotenv';
-dotenv.config(); // Carrega as variáveis de ambiente primeiro
+dotenv.config();
 
 import express, { Request, Response } from 'express';
 import cors from 'cors';
@@ -36,7 +37,6 @@ app.post('/login', async (req: Request, res: Response) => {
     res.status(500).send("Erro no servidor durante o login.");
   }
 });
-
 
 // --- ROTAS DE USUÁRIOS (CRUD) ---
 
@@ -273,7 +273,5 @@ app.post('/settings/email', async (req: Request, res: Response) => {
     }
 });
 
-
-app.listen(port, () => {
-  console.log(`🚀 Servidor backend rodando em http://localhost:${port}`);
-});
+// Exporte a aplicação Express como uma Cloud Function
+export const api = functions.https.onRequest(app);

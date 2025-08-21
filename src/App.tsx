@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './hooks/useAuth';
+import { SettingsProvider } from './hooks/useSettings'; // <-- 1. Importar
 import LoginForm from './components/Auth/LoginForm';
 import Sidebar from './components/Layout/Sidebar';
 import Header from './components/Layout/Header';
@@ -17,7 +18,6 @@ function AppContent() {
   const [activeSection, setActiveSection] = useState('dashboard');
 
   useEffect(() => {
-    // Preload critical data
     if (user) {
       setActiveSection('dashboard');
     }
@@ -32,7 +32,7 @@ function AppContent() {
   }
 
   const getSectionTitle = () => {
-    const titles = {
+    const titles: { [key: string]: string } = {
       dashboard: 'Dashboard',
       tickets: 'Gerenciar Chamados',
       users: 'Usuários',
@@ -41,7 +41,7 @@ function AppContent() {
       categories: 'Categorias',
       settings: 'Configurações',
     };
-    return titles[activeSection as keyof typeof titles] || 'Dashboard';
+    return titles[activeSection] || 'Dashboard';
   };
 
   const renderContent = () => {
@@ -86,7 +86,9 @@ function AppContent() {
 function App() {
   return (
     <AuthProvider>
-      <AppContent />
+      <SettingsProvider> {/* <-- 2. Envolver o AppContent */}
+        <AppContent />
+      </SettingsProvider>
     </AuthProvider>
   );
 }

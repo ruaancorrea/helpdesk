@@ -1,8 +1,8 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User, AuthContext as AuthContextType } from '../types';
-import { getUsers } from '../utils/api';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const API_URL = 'http://localhost:3001';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -18,12 +18,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
-      const users = await getUsers();
-      const foundUser = users.find(u => u.email === email && u.password === password);
+      const response = await fetch(`${API_URL}/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+
+      if (!response.ok) {
+        return false;
+      }
+
+      const data = await response.json();
       
-      if (foundUser) {
-        setUser(foundUser);
-        localStorage.setItem('helpdesk_user', JSON.stringify(foundUser));
+      if (data.success && data.user) {
+        setUser(data.user);
+        localStorage.setItem('helpdesk_user', JSON.stringify(data.user));
         return true;
       }
       return false;

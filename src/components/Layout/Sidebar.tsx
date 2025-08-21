@@ -9,6 +9,7 @@ import {
   UserCog
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
+import { useSettings } from '../../hooks/useSettings';
 
 interface SidebarProps {
   activeSection: string;
@@ -17,6 +18,7 @@ interface SidebarProps {
 
 export default function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
   const { user, logout } = useAuth();
+  const { settings } = useSettings();
 
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -35,7 +37,7 @@ export default function Sidebar({ activeSection, onSectionChange }: SidebarProps
   return (
     <div className="w-64 bg-navy-900 text-white flex flex-col h-full">
       <div className="p-6 border-b border-navy-700">
-        <h1 className="text-xl font-bold">HelpDesk Pro</h1>
+        <h1 className="text-xl font-bold">{settings?.general?.companyName || 'HelpDesk Pro'}</h1>
         <p className="text-sm text-navy-300 mt-1">{user?.name}</p>
         <p className="text-xs text-navy-400">{user?.department}</p>
       </div>

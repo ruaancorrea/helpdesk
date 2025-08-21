@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Download, Calendar, BarChart3, PieChart, TrendingUp } from 'lucide-react';
 import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable'; // <-- MUDANÇA 1: Importar 'autoTable' diretamente.
+import autoTable from 'jspdf-autotable';
 import { getTickets, getUsers, getCategories } from '../../utils/api';
 import { Ticket, User, Category } from '../../types';
 import { formatDate, calculateResolutionTime, getStatusLabel, getPriorityLabel } from '../../utils/helpers';
@@ -11,35 +11,52 @@ export default function Reports() {
   const [users, setUsers] = useState<User[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [dateRange, setDateRange] = useState({
-    start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    start: '', // Será definido dinamicamente
     end: new Date().toISOString().split('T')[0]
   });
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    const loadData = async () => {
+      try {
+        setIsLoading(true);
+        const [ticketsData, usersData, categoriesData] = await Promise.all([
+          getTickets(),
+          getUsers(),
+          getCategories()
+        ]);
+
+        setTickets(ticketsData);
+        setUsers(usersData);
+        setCategories(categoriesData);
+
+        if (ticketsData.length > 0) {
+          const oldestTicket = ticketsData.reduce((oldest, current) => {
+            return new Date(current.createdAt) < new Date(oldest.createdAt) ? current : oldest;
+          });
+          setDateRange(prev => ({
+            ...prev,
+            start: new Date(oldestTicket.createdAt).toISOString().split('T')[0]
+          }));
+        } else {
+            setDateRange(prev => ({
+                ...prev,
+                start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+            }));
+        }
+
+      } catch (error) {
+        console.error('Erro ao carregar dados:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
     loadData();
   }, []);
 
-  const loadData = async () => {
-    try {
-      setIsLoading(true);
-      const [ticketsData, usersData, categoriesData] = await Promise.all([
-        getTickets(),
-        getUsers(),
-        getCategories()
-      ]);
-
-      setTickets(ticketsData);
-      setUsers(usersData);
-      setCategories(categoriesData);
-    } catch (error) {
-      console.error('Erro ao carregar dados:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const filteredTickets = tickets.filter(ticket => {
+    if (!dateRange.start) return false;
+
     const ticketDate = new Date(ticket.createdAt);
     const startDate = new Date(dateRange.start);
     const endDate = new Date(dateRange.end);
@@ -120,7 +137,6 @@ export default function Reports() {
         ];
     });
 
-    // <-- MUDANÇA 2: Usar 'autoTable' como uma função que recebe 'doc'.
     autoTable(doc, {
         startY: 30,
         head: [['ID', 'Título', 'Status', 'Prioridade', 'Categoria', 'Usuário', 'Criado em']],
@@ -161,7 +177,7 @@ export default function Reports() {
     document.body.removeChild(link);
   };
 
-  if (isLoading) {
+  if (isLoading || !dateRange.start) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
