@@ -38,6 +38,7 @@ app.post('/login', async (req: Request, res: Response) => {
   }
 });
 
+
 // --- ROTAS DE USUÁRIOS (CRUD) ---
 
 app.get('/users', async (req: Request, res: Response) => {
@@ -272,6 +273,7 @@ app.post('/settings/email', async (req: Request, res: Response) => {
         res.status(500).send("Erro ao salvar configurações de e-mail.");
     }
 });
+
 
 // Exporte a aplicação Express como uma Cloud Function
 export const api = functions.https.onRequest(app);
