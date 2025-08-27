@@ -1,6 +1,6 @@
 import { User, Ticket, Category, SLAConfig, Timeline, InternalComment } from '../types';
 
-const API_URL = 'http://localhost:3001';
+export const API_URL = 'https://helpdesk-backend-cni6.onrender.com';
 
 // --- ROTAS DE USUÁRIOS ---
 

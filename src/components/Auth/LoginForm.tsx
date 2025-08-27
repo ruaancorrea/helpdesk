@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { HelpCircle, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useSettings } from '../../hooks/useSettings';
+import { API_URL } from '../../utils/api'; // <-- ADICIONEI ESTA LINHA
 
 export default function LoginForm() {
   const [email, setEmail] = useState('');
@@ -37,6 +38,8 @@ export default function LoginForm() {
             </div>
             <h1 className="text-3xl font-bold text-gray-900">{settings?.general?.companyName || 'HelpDesk Pro'}</h1>
             <p className="text-gray-600 mt-2">Acesse sua conta para continuar</p>
+            {/* VAMOS MOSTRAR A URL AQUI PARA DEBUG */}
+            <p className="text-xs text-red-500 mt-2">API URL: {API_URL}</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">

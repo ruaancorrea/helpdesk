@@ -33,7 +33,7 @@ function AppContent() {
 
   const getSectionTitle = () => {
     const titles: { [key: string]: string } = {
-      dashboard: 'Dashboard',
+      dashboard: 'Dashboard v2 - PROVA DE DEPLOY', // <-- AQUI ESTÁ A ALTERAÇÃO
       tickets: 'Gerenciar Chamados',
       users: 'Usuários',
       technicians: 'Técnicos',
