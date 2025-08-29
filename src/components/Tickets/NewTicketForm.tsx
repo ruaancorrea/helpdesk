@@ -1,14 +1,20 @@
 import React, { useState } from 'react';
-import { X, Upload, AlertCircle } from 'lucide-react';
+import { X, Upload, AlertCircle, Loader2 } from 'lucide-react';
 import { Category } from '../../types';
 import { createTicket } from '../../utils/api';
 import { useAuth } from '../../hooks/useAuth';
 import { calculateSLADeadline } from '../../utils/helpers';
+import { API_URL } from '../../utils/api';
 
 interface NewTicketFormProps {
   categories: Category[];
   onClose: () => void;
   onSuccess: () => void;
+}
+
+interface Attachment {
+  name: string;
+  url: string;
 }
 
 export default function NewTicketForm({ categories, onClose, onSuccess }: NewTicketFormProps) {
@@ -19,7 +25,8 @@ export default function NewTicketForm({ categories, onClose, onSuccess }: NewTic
     priority: 'medium' as const,
     category: '',
   });
-  const [attachments, setAttachments] = useState<string[]>([]);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -38,23 +45,50 @@ export default function NewTicketForm({ categories, onClose, onSuccess }: NewTic
         ...formData,
         userId: user.id,
         status: 'open',
-        attachments,
-        slaDeadline: calculateSLADeadline(new Date().toISOString(), slaHours)
+        attachments: attachments.map(att => JSON.stringify(att)),
+        slaDeadline: calculateSLADeadline(new Date().toISOString(), slaHours),
       });
 
       onSuccess();
       onClose();
-    } catch (err) {
+    } catch {
       setError('Erro ao criar chamado. Tente novamente.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    const fileNames = files.map(file => file.name);
-    setAttachments(prev => [...prev, ...fileNames]);
+    if (files.length === 0) return;
+
+    setIsUploading(true);
+    setError('');
+
+    const allowedExtensions = /\.(jpg|jpeg|png|gif|webp)$/i;
+
+    for (const file of files) {
+      if (!allowedExtensions.test(file.name)) {
+        setError(`O arquivo "${file.name}" não é uma imagem permitida.`);
+        continue; // pula arquivo inválido
+      }
+
+      const formDataFile = new FormData();
+      formDataFile.append('file', file);
+
+      try {
+        const response = await fetch(`${API_URL}/upload`, { method: 'POST', body: formDataFile });
+        if (!response.ok) throw new Error('Falha no upload do arquivo.');
+
+        const data = await response.json();
+        setAttachments(prev => [...prev, { name: data.name, url: data.url }]);
+      } catch {
+        setError(`Erro ao enviar o arquivo "${file.name}".`);
+        break;
+      }
+    }
+
+    setIsUploading(false);
   };
 
   return (
@@ -62,10 +96,7 @@ export default function NewTicketForm({ categories, onClose, onSuccess }: NewTic
       <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <h2 className="text-xl font-semibold text-gray-900">Novo Chamado</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
             <X size={24} />
           </button>
         </div>
@@ -79,9 +110,7 @@ export default function NewTicketForm({ categories, onClose, onSuccess }: NewTic
           )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Título do Chamado *
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Título do Chamado *</label>
             <input
               type="text"
               value={formData.title}
@@ -94,9 +123,7 @@ export default function NewTicketForm({ categories, onClose, onSuccess }: NewTic
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Categoria *
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Categoria *</label>
               <select
                 value={formData.category}
                 onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
@@ -104,18 +131,12 @@ export default function NewTicketForm({ categories, onClose, onSuccess }: NewTic
                 required
               >
                 <option value="">Selecione uma categoria</option>
-                {categories.map(category => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
-                ))}
+                {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Prioridade
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Prioridade</label>
               <select
                 value={formData.priority}
                 onChange={(e) => setFormData(prev => ({ ...prev, priority: e.target.value as any }))}
@@ -130,50 +151,50 @@ export default function NewTicketForm({ categories, onClose, onSuccess }: NewTic
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Descrição Detalhada *
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Descrição Detalhada *</label>
             <textarea
               value={formData.description}
               onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
               rows={6}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="Descreva o problema em detalhes, incluindo quando ocorreu, como reproduzir, mensagens de erro, etc."
+              placeholder="Descreva o problema em detalhes..."
               required
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Anexos
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Anexos (Somente Imagens)</label>
             <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
               <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
               <p className="text-sm text-gray-600 mb-2">
-                Clique para selecionar arquivos ou arraste e solte aqui
+                {isUploading ? 'Enviando imagens...' : 'Clique para selecionar ou arraste e solte aqui'}
               </p>
+
               <input
                 type="file"
                 multiple
                 onChange={handleFileUpload}
+                disabled={isUploading}
                 className="hidden"
                 id="file-upload"
-                accept=".jpg,.jpeg,.png,.pdf,.doc,.docx"
+                accept=".jpg,.jpeg,.png,.gif,.webp"
               />
               <label
                 htmlFor="file-upload"
-                className="text-blue-600 hover:text-blue-700 cursor-pointer text-sm"
+                className={`text-blue-600 hover:text-blue-700 cursor-pointer text-sm ${isUploading ? 'opacity-50' : ''}`}
               >
-                Selecionar Arquivos
+                Selecionar Imagens
               </label>
+
+              {isUploading && <Loader2 className="w-5 h-5 text-gray-500 animate-spin mx-auto mt-2" />}
             </div>
-            
+
             {attachments.length > 0 && (
               <div className="mt-4 space-y-2">
-                <p className="text-sm font-medium text-gray-700">Arquivos selecionados:</p>
+                <p className="text-sm font-medium text-gray-700">Imagens selecionadas:</p>
                 {attachments.map((file, index) => (
                   <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
-                    <span className="text-sm text-gray-700">{file}</span>
+                    <span className="text-sm text-gray-700">{file.name}</span>
                     <button
                       type="button"
                       onClick={() => setAttachments(prev => prev.filter((_, i) => i !== index))}
@@ -197,7 +218,7 @@ export default function NewTicketForm({ categories, onClose, onSuccess }: NewTic
             </button>
             <button
               type="submit"
-              disabled={isLoading || !formData.title || !formData.description || !formData.category}
+              disabled={isLoading || isUploading || !formData.title || !formData.description || !formData.category}
               className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {isLoading ? 'Criando...' : 'Criar Chamado'}

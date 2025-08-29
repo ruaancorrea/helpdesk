@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { 
   ArrowLeft, 
-  User, 
   Calendar, 
   Clock, 
   MessageSquare, 
@@ -12,9 +11,10 @@ import {
   Pause,
   Send,
   UserCheck,
-  Settings
+  Settings,
+  Trash2 // <-- 1. IMPORTAR O ÍCONE
 } from 'lucide-react';
-import { Ticket, User as UserType, Category, Timeline } from '../../types';
+import { Ticket, User as UserType, Category } from '../../types';
 import { 
   formatDate, 
   getPriorityColor, 
@@ -24,7 +24,8 @@ import {
   isSLAOverdue,
   isSLANearDeadline 
 } from '../../utils/helpers';
-import { updateTicket, addTimelineEntry, addInternalComment, getUsers } from '../../utils/api';
+// 2. IMPORTAR A NOVA FUNÇÃO deleteTicket
+import { updateTicket, addTimelineEntry, addInternalComment, deleteTicket } from '../../utils/api'; 
 import { useAuth } from '../../hooks/useAuth';
 
 interface TicketDetailProps {
@@ -57,7 +58,6 @@ export default function TicketDetail({ ticket, users, categories, onBack, onUpda
   }, [isTimerRunning]);
 
   const ticketUser = users.find(u => u.id === ticket.userId);
-  const assignedTechnician = users.find(u => u.id === ticket.assignedTo);
   const category = categories.find(c => c.id === ticket.category);
   const technicians = users.filter(u => u.role === 'technician');
 
@@ -71,11 +71,34 @@ export default function TicketDetail({ ticket, users, categories, onBack, onUpda
   const canEdit = user?.role === 'admin' || user?.role === 'technician' || user?.id === ticket.userId;
   const canAssign = user?.role === 'admin' || user?.role === 'technician';
 
+  // --- 3. ADICIONAR A NOVA FUNÇÃO DE EXCLUSÃO ---
+  const handleDeleteTicket = async () => {
+    if (user?.role !== 'admin') return;
+
+    if (window.confirm('Tem a certeza de que deseja apagar este chamado permanentemente? Esta ação não pode ser desfeita.')) {
+        setIsUpdating(true);
+        try {
+            await deleteTicket(ticket.id);
+            alert('Chamado apagado com sucesso.');
+            onUpdate(); // Atualiza a lista de chamados
+            onBack(); // Volta para a lista
+        } catch (error) {
+            console.error('Erro ao apagar chamado:', error);
+            alert('Não foi possível apagar o chamado.');
+        } finally {
+            setIsUpdating(false);
+        }
+    }
+  };
+
   const handleStatusUpdate = async () => {
     if (!canEdit) return;
     
     setIsUpdating(true);
     try {
+      const statusChanged = newStatus !== ticket.status;
+      const assignmentChanged = assignedTo !== ticket.assignedTo;
+
       await updateTicket(ticket.id, { 
         status: newStatus,
         priority: newPriority,
@@ -83,20 +106,17 @@ export default function TicketDetail({ ticket, users, categories, onBack, onUpda
         resolvedAt: newStatus === 'resolved' ? new Date().toISOString() : ticket.resolvedAt
       });
 
-      // Add timeline entry for status change
-      if (newStatus !== ticket.status) {
+      if (statusChanged) {
         await addTimelineEntry(ticket.id, {
           ticketId: ticket.id,
           userId: user!.id,
           userName: user!.name,
           message: `Status alterado para ${getStatusLabel(newStatus)}`,
           type: 'status_change',
-          createdAt: new Date().toISOString()
         });
       }
 
-      // Add timeline entry for assignment
-      if (assignedTo !== ticket.assignedTo) {
+      if (assignmentChanged) {
         const assignedUser = users.find(u => u.id === assignedTo);
         await addTimelineEntry(ticket.id, {
           ticketId: ticket.id,
@@ -104,7 +124,6 @@ export default function TicketDetail({ ticket, users, categories, onBack, onUpda
           userName: user!.name,
           message: assignedUser ? `Chamado atribuído para ${assignedUser.name}` : 'Chamado desatribuído',
           type: 'assignment',
-          createdAt: new Date().toISOString()
         });
       }
 
@@ -127,7 +146,6 @@ export default function TicketDetail({ ticket, users, categories, onBack, onUpda
         userName: user.name,
         message: newComment,
         type: 'comment',
-        createdAt: new Date().toISOString()
       });
 
       setNewComment('');
@@ -149,7 +167,6 @@ export default function TicketDetail({ ticket, users, categories, onBack, onUpda
         technicianId: user.id,
         technicianName: user.name,
         message: newInternalComment,
-        createdAt: new Date().toISOString()
       });
 
       setNewInternalComment('');
@@ -163,38 +180,49 @@ export default function TicketDetail({ ticket, users, categories, onBack, onUpda
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <div className="flex items-center justify-between mb-6">
-          <button
-            onClick={onBack}
-            className="flex items-center space-x-2 text-gray-600 hover:text-gray-800 transition-colors"
-          >
-            <ArrowLeft size={20} />
-            <span>Voltar</span>
-          </button>
+          <div className="flex items-center space-x-4">
+              <button
+                onClick={onBack}
+                className="flex items-center space-x-2 text-gray-600 hover:text-gray-800 transition-colors"
+              >
+                <ArrowLeft size={20} />
+                <span>Voltar</span>
+              </button>
 
+              {/* --- 4. ADICIONAR O BOTÃO DE EXCLUSÃO AQUI --- */}
+              {user?.role === 'admin' && (
+                <button
+                    onClick={handleDeleteTicket}
+                    disabled={isUpdating}
+                    className="flex items-center space-x-2 text-red-600 hover:text-red-800 disabled:opacity-50 transition-colors"
+                >
+                    <Trash2 size={20} />
+                    <span>Apagar</span>
+                </button>
+              )}
+          </div>
+          
           {canAssign && (
             <div className="flex items-center space-x-2">
-              {/* Timer */}
-              <div className="flex items-center space-x-2 bg-gray-50 px-3 py-2 rounded-lg">
-                <Clock size={16} />
-                <span className="font-mono text-sm">{formatTimer(workTimer)}</span>
-                <button
-                  onClick={() => setIsTimerRunning(!isTimerRunning)}
-                  className={`p-1 rounded ${
-                    isTimerRunning ? 'text-red-600 hover:text-red-700' : 'text-green-600 hover:text-green-700'
-                  }`}
-                >
-                  {isTimerRunning ? <Pause size={16} /> : <Play size={16} />}
-                </button>
-              </div>
+                <div className="flex items-center space-x-2 bg-gray-50 px-3 py-2 rounded-lg">
+                    <Clock size={16} />
+                    <span className="font-mono text-sm">{formatTimer(workTimer)}</span>
+                    <button
+                        onClick={() => setIsTimerRunning(!isTimerRunning)}
+                        className={`p-1 rounded ${
+                        isTimerRunning ? 'text-red-600 hover:text-red-700' : 'text-green-600 hover:text-green-700'
+                        }`}
+                    >
+                        {isTimerRunning ? <Pause size={16} /> : <Play size={16} />}
+                    </button>
+                </div>
             </div>
           )}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Ticket Info */}
           <div className="lg:col-span-2">
             <h1 className="text-2xl font-bold text-gray-900 mb-4">{ticket.title}</h1>
             
@@ -219,46 +247,54 @@ export default function TicketDetail({ ticket, users, categories, onBack, onUpda
               <div className="mt-6">
                 <h3 className="font-medium text-gray-900 mb-2">Anexos</h3>
                 <div className="flex flex-wrap gap-2">
-                  {ticket.attachments.map((attachment, index) => (
-                    <div key={index} className="flex items-center space-x-2 bg-gray-50 px-3 py-2 rounded-lg">
-                      <Paperclip size={16} />
-                      <span className="text-sm">{attachment}</span>
-                    </div>
-                  ))}
+                  {ticket.attachments.map((attachmentString, index) => {
+                    try {
+                      const attachment = JSON.parse(attachmentString);
+                      const downloadUrl = attachment.url.replace(
+                        '/upload/',
+                        `/upload/fl_attachment:${encodeURIComponent(attachment.name)}/`
+                      );
+                      
+                      return (
+                        <a 
+                          key={index} 
+                          href={downloadUrl}
+                          className="flex items-center space-x-2 bg-gray-50 px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors"
+                        >
+                          <Paperclip size={16} />
+                          <span className="text-sm text-blue-600 hover:underline">{attachment.name}</span>
+                        </a>
+                      );
+                    } catch (e) { 
+                      return (
+                        <div key={index} className="flex items-center space-x-2 bg-gray-50 px-3 py-2 rounded-lg">
+                           <Paperclip size={16} />
+                           <span className="text-sm">{attachmentString}</span>
+                        </div>
+                      )
+                    }
+                  })}
                 </div>
               </div>
             )}
           </div>
 
-          {/* Sidebar */}
           <div className="space-y-6">
-            {/* SLA Status */}
             <div className="bg-gray-50 rounded-xl p-4">
               <h3 className="font-medium text-gray-900 mb-3">Status SLA</h3>
               <div className="flex items-center space-x-2">
                 {isSLAOverdue(ticket.slaDeadline) ? (
-                  <>
-                    <AlertTriangle className="w-5 h-5 text-red-600" />
-                    <span className="text-red-600 font-medium">Vencido</span>
-                  </>
+                  <><AlertTriangle className="w-5 h-5 text-red-600" /> <span className="text-red-600 font-medium">Vencido</span></>
                 ) : isSLANearDeadline(ticket.slaDeadline) ? (
-                  <>
-                    <Clock className="w-5 h-5 text-yellow-600" />
-                    <span className="text-yellow-600 font-medium">Próximo do Vencimento</span>
-                  </>
+                  <><Clock className="w-5 h-5 text-yellow-600" /> <span className="text-yellow-600 font-medium">Próximo do Vencimento</span></>
                 ) : (
-                  <>
-                    <CheckCircle className="w-5 h-5 text-green-600" />
-                    <span className="text-green-600 font-medium">No Prazo</span>
-                  </>
+                  <><CheckCircle className="w-5 h-5 text-green-600" /> <span className="text-green-600 font-medium">No Prazo</span></>
                 )}
               </div>
               <p className="text-sm text-gray-500 mt-1">
                 Prazo: {formatDate(ticket.slaDeadline)}
               </p>
             </div>
-
-            {/* User Info */}
             <div className="bg-gray-50 rounded-xl p-4">
               <h3 className="font-medium text-gray-900 mb-3">Solicitante</h3>
               <div className="flex items-center space-x-3">
@@ -272,8 +308,6 @@ export default function TicketDetail({ ticket, users, categories, onBack, onUpda
                 </div>
               </div>
             </div>
-
-            {/* Category */}
             <div className="bg-gray-50 rounded-xl p-4">
               <h3 className="font-medium text-gray-900 mb-3">Categoria</h3>
               <div className="flex items-center space-x-2">
@@ -284,8 +318,6 @@ export default function TicketDetail({ ticket, users, categories, onBack, onUpda
                 <span className="text-gray-900">{category?.name}</span>
               </div>
             </div>
-
-            {/* Assignment */}
             {canAssign && (
               <div className="bg-gray-50 rounded-xl p-4">
                 <h3 className="font-medium text-gray-900 mb-3">Atribuição</h3>
@@ -303,8 +335,6 @@ export default function TicketDetail({ ticket, users, categories, onBack, onUpda
                 </select>
               </div>
             )}
-
-            {/* Status Update */}
             {canEdit && (
               <div className="bg-gray-50 rounded-xl p-4">
                 <h3 className="font-medium text-gray-900 mb-3">Atualizar Status</h3>
@@ -320,7 +350,6 @@ export default function TicketDetail({ ticket, users, categories, onBack, onUpda
                     <option value="resolved">Resolvido</option>
                     <option value="closed">Fechado</option>
                   </select>
-                  
                   <select
                     value={newPriority}
                     onChange={(e) => setNewPriority(e.target.value as any)}
@@ -331,7 +360,6 @@ export default function TicketDetail({ ticket, users, categories, onBack, onUpda
                     <option value="high">Alta</option>
                     <option value="critical">Crítica</option>
                   </select>
-
                   <button
                     onClick={handleStatusUpdate}
                     disabled={isUpdating}
@@ -345,11 +373,8 @@ export default function TicketDetail({ ticket, users, categories, onBack, onUpda
           </div>
         </div>
       </div>
-
-      {/* Timeline */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-6">Histórico do Chamado</h2>
-        
         <div className="space-y-4">
           {ticket.timeline.map((entry) => (
             <div key={entry.id} className="flex space-x-4">
@@ -373,13 +398,9 @@ export default function TicketDetail({ ticket, users, categories, onBack, onUpda
           ))}
         </div>
       </div>
-
-      {/* Comments Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Public Comments */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Adicionar Comentário</h3>
-          
           <div className="space-y-4">
             <textarea
               value={newComment}
@@ -388,7 +409,6 @@ export default function TicketDetail({ ticket, users, categories, onBack, onUpda
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               rows={4}
             />
-            
             <button
               onClick={handleAddComment}
               disabled={!newComment.trim() || isUpdating}
@@ -399,12 +419,9 @@ export default function TicketDetail({ ticket, users, categories, onBack, onUpda
             </button>
           </div>
         </div>
-
-        {/* Internal Comments (Technicians only) */}
         {user?.role !== 'user' && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Comentário Interno</h3>
-            
             <div className="space-y-4">
               <textarea
                 value={newInternalComment}
@@ -413,7 +430,6 @@ export default function TicketDetail({ ticket, users, categories, onBack, onUpda
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 rows={4}
               />
-              
               <button
                 onClick={handleAddInternalComment}
                 disabled={!newInternalComment.trim() || isUpdating}
@@ -423,8 +439,6 @@ export default function TicketDetail({ ticket, users, categories, onBack, onUpda
                 <span>Comentário Interno</span>
               </button>
             </div>
-
-            {/* Show Internal Comments */}
             {ticket.internalComments.length > 0 && (
               <div className="mt-6 pt-6 border-t border-gray-200">
                 <h4 className="font-medium text-gray-900 mb-4">Comentários Internos</h4>

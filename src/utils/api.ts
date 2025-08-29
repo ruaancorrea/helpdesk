@@ -167,3 +167,13 @@ export async function saveEmailSettings(settings: any) {
     if (!response.ok) throw new Error('Falha ao salvar configurações de e-mail');
     return response.json();
 }
+// --- NOVA FUNÇÃO PARA APAGAR TICKET ---
+
+export async function deleteTicket(id: string): Promise<void> {
+  const response = await fetch(`${API_URL}/tickets/${id}`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) {
+    throw new Error('Falha ao apagar o chamado');
+  }
+}

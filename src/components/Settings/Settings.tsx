@@ -3,17 +3,43 @@ import { Save, Clock, Mail, Shield } from 'lucide-react';
 import { getSLAConfig, updateSLAConfig } from '../../utils/api';
 import { SLAConfig } from '../../types';
 import { useSettings } from '../../hooks/useSettings';
+import { API_URL } from '../../utils/api'; // Importar a API_URL corretamente
 
 export default function Settings() {
   const { settings, updateSettings, isLoading: isLoadingSettings } = useSettings();
   const [slaConfig, setSlaConfig] = useState<SLAConfig[]>([]);
   
-  // Estados locais para os formulários, inicializados com os dados do contexto
   const [localGeneralSettings, setLocalGeneralSettings] = useState(settings?.general);
   const [localEmailSettings, setLocalEmailSettings] = useState(settings?.email);
   
   const [isLoadingSLA, setIsLoadingSLA] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [testEmail, setTestEmail] = useState('');
+
+  const handleSendTestEmail = async () => {
+    if (!testEmail) {
+        alert('Por favor, digite um e-mail para enviar o teste.');
+        return;
+    }
+    setIsSaving(true);
+    try {
+        const response = await fetch(`${API_URL}/send-test-email`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ to: testEmail }),
+        });
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText);
+        }
+        alert('E-mail de teste enviado com sucesso!');
+    } catch (error: any) { // Corrigido o tipo do erro aqui
+        console.error('Erro ao enviar e-mail de teste:', error);
+        alert(`Erro ao enviar e-mail: ${error.message}`);
+    } finally {
+        setIsSaving(false);
+    }
+  };
 
   useEffect(() => {
     if(settings) {
@@ -168,7 +194,7 @@ export default function Settings() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Usuário SMTP</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Usuário SMTP (Seu e-mail)</label>
             <input
               type="email"
               value={localEmailSettings.smtpUser}
@@ -177,7 +203,7 @@ export default function Settings() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Senha SMTP</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Senha SMTP (Senha de App)</label>
             <input
               type="password"
               value={localEmailSettings.smtpPassword}
@@ -185,6 +211,28 @@ export default function Settings() {
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
+          
+          <div className="md:col-span-2">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Enviar E-mail de Teste</label>
+            <div className="flex items-center space-x-2">
+                <input
+                  type="email"
+                  placeholder="Digite um e-mail de destino"
+                  value={testEmail}
+                  onChange={(e) => setTestEmail(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+                <button
+                  type="button"
+                  onClick={handleSendTestEmail}
+                  disabled={isSaving}
+                  className="px-4 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50"
+                >
+                  Enviar
+                </button>
+            </div>
+          </div>
+
         </div>
       </div>
 

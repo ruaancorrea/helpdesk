@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { getTickets, getUsers, getCategories } from '../../utils/api';
 import { Ticket, User, Category } from '../../types';
 import TicketList from './TicketList';
