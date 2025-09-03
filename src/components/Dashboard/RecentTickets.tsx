@@ -1,4 +1,3 @@
-import React from 'react';
 import { Clock, User, ArrowRight } from 'lucide-react';
 import { Ticket, User as UserType } from '../../types';
 import { formatDateShort, getPriorityColor, getStatusColor, getPriorityLabel, getStatusLabel } from '../../utils/helpers';
@@ -7,9 +6,10 @@ interface RecentTicketsProps {
   tickets: Ticket[];
   users: UserType[];
   onTicketClick: (ticketId: string) => void;
+  onViewAllClick?: () => void;
 }
 
-export default function RecentTickets({ tickets, users, onTicketClick }: RecentTicketsProps) {
+export default function RecentTickets({ tickets, users, onTicketClick, onViewAllClick }: RecentTicketsProps) {
   const recentTickets = tickets
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(0, 5);
@@ -23,7 +23,10 @@ export default function RecentTickets({ tickets, users, onTicketClick }: RecentT
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-lg font-semibold text-gray-900">Chamados Recentes</h3>
-        <ArrowRight className="w-5 h-5 text-gray-400" />
+        <ArrowRight 
+          className="w-5 h-5 text-gray-400 cursor-pointer hover:text-gray-600 transition-colors"
+          onClick={onViewAllClick || (() => {})}
+        />
       </div>
 
       <div className="space-y-4">

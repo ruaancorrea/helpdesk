@@ -17,10 +17,16 @@ interface EmailSettings {
     notifyOnClose: boolean;
 }
 
+interface UserPreferences {
+    darkMode: boolean;
+    sidebarCollapsed: boolean;
+}
+
 // Tipo que agrupa todas as configurações
 interface AllSettings {
     general: GeneralSettings;
     email: EmailSettings;
+    preferences: UserPreferences;
 }
 
 interface SettingsContextType {
@@ -45,6 +51,10 @@ const defaultSettings: AllSettings = {
         notifyOnNew: true,
         notifyOnUpdate: true,
         notifyOnClose: true,
+    },
+    preferences: {
+        darkMode: false,
+        sidebarCollapsed: false,
     }
 };
 
@@ -55,6 +65,14 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const loadSettings = useCallback(async () => {
     try {
       setIsLoading(true);
+      
+      // Carregar preferências do localStorage
+      let userPreferences = defaultSettings.preferences;
+      const savedPreferences = localStorage.getItem('helpdesk_preferences');
+      if (savedPreferences) {
+        userPreferences = JSON.parse(savedPreferences);
+      }
+      
       const [generalData, emailData] = await Promise.all([
         getGeneralSettings(),
         getEmailSettings()
@@ -62,7 +80,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       
       setSettings({
           general: generalData || defaultSettings.general,
-          email: emailData || defaultSettings.email
+          email: emailData || defaultSettings.email,
+          preferences: userPreferences
       });
 
     } catch (error) {
@@ -82,6 +101,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         saveGeneralSettings(newSettings.general),
         saveEmailSettings(newSettings.email)
     ]);
+    
+    // Salvar preferências no localStorage
+    localStorage.setItem('helpdesk_preferences', JSON.stringify(newSettings.preferences));
+    
     setSettings(newSettings);
   };
 

@@ -94,6 +94,13 @@ export default function TicketDetail({ ticket, users, categories, onBack, onUpda
   const handleStatusUpdate = async () => {
     if (!canEdit) return;
     
+    // Verificar se o chamado está atribuído antes de permitir mudanças de status
+    // Exceto para status 'open' (Aberto) que pode ficar sem atribuição
+    if (newStatus !== 'open' && !assignedTo) {
+      alert('É necessário atribuir o chamado a um técnico antes de alterar o status.');
+      return;
+    }
+    
     setIsUpdating(true);
     try {
       const statusChanged = newStatus !== ticket.status;
@@ -116,13 +123,13 @@ export default function TicketDetail({ ticket, users, categories, onBack, onUpda
         });
       }
 
-      if (assignmentChanged) {
+      if (assignmentChanged && assignedTo) {
         const assignedUser = users.find(u => u.id === assignedTo);
         await addTimelineEntry(ticket.id, {
           ticketId: ticket.id,
           userId: user!.id,
           userName: user!.name,
-          message: assignedUser ? `Chamado atribuído para ${assignedUser.name}` : 'Chamado desatribuído',
+          message: `Chamado atribuído para ${assignedUser?.name}`,
           type: 'assignment',
         });
       }
@@ -178,6 +185,52 @@ export default function TicketDetail({ ticket, users, categories, onBack, onUpda
     }
   };
 
+  const handleTimerToggle = async () => {
+    if (!canAssign) return;
+
+    // Verificar se o chamado está atribuído antes de iniciar o timer
+    if (!ticket.assignedTo) {
+      alert('É necessário atribuir o chamado a um técnico antes de iniciar o trabalho.');
+      return;
+    }
+
+    const wasRunning = isTimerRunning;
+    setIsTimerRunning(!isTimerRunning);
+
+    // Se está iniciando o timer (play)
+    if (!wasRunning) {
+      setIsUpdating(true);
+      try {
+        // Se o status não é 'Em Andamento', atualiza para 'Em Andamento'
+        if (ticket.status !== 'in_progress') {
+          await updateTicket(ticket.id, { 
+            status: 'in_progress',
+            priority: ticket.priority,
+            assignedTo: ticket.assignedTo || undefined
+          });
+
+          await addTimelineEntry(ticket.id, {
+            ticketId: ticket.id,
+            userId: user!.id,
+            userName: user!.name,
+            message: 'Status alterado para Em Andamento',
+            type: 'status_change',
+          });
+
+          setNewStatus('in_progress');
+        }
+
+
+
+        onUpdate();
+      } catch (error) {
+        console.error('Erro ao iniciar timer:', error);
+      } finally {
+        setIsUpdating(false);
+      }
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
@@ -210,10 +263,11 @@ export default function TicketDetail({ ticket, users, categories, onBack, onUpda
                     <Clock size={16} />
                     <span className="font-mono text-sm">{formatTimer(workTimer)}</span>
                     <button
-                        onClick={() => setIsTimerRunning(!isTimerRunning)}
+                        onClick={handleTimerToggle}
+                        disabled={isUpdating}
                         className={`p-1 rounded ${
                         isTimerRunning ? 'text-red-600 hover:text-red-700' : 'text-green-600 hover:text-green-700'
-                        }`}
+                        } disabled:opacity-50`}
                     >
                         {isTimerRunning ? <Pause size={16} /> : <Play size={16} />}
                     </button>

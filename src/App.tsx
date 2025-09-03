@@ -1,21 +1,26 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { AuthProvider, useAuth } from './hooks/useAuth';
-import { SettingsProvider } from './hooks/useSettings'; // <-- 1. Importar
+import { SettingsProvider } from './hooks/useSettings';
+import { ToastProvider } from './hooks/useToast';
+import ThemeProvider from './components/Common/ThemeProvider';
+import Toast from './components/Common/Toast';
 import LoginForm from './components/Auth/LoginForm';
 import Sidebar from './components/Layout/Sidebar';
-import Header from './components/Layout/Header';
-import Dashboard from './components/Dashboard/Dashboard';
-import TicketManagement from './components/Tickets/TicketManagement';
-import UserManagement from './components/Users/UserManagement';
-import TechnicianManagement from './components/Technicians/TechnicianManagement';
-import Reports from './components/Reports/Reports';
-import Categories from './components/Categories/Categories';
-import Settings from './components/Settings/Settings';
+import { Header } from './components/Layout/Header';
 import LoadingSpinner from './components/Common/LoadingSpinner';
+
+const Dashboard = React.lazy(() => import('./components/Dashboard/Dashboard'));
+const TicketManagement = React.lazy(() => import('./components/Tickets/TicketManagement'));
+const UserManagement = React.lazy(() => import('./components/Users/UserManagement'));
+const TechnicianManagement = React.lazy(() => import('./components/Technicians/TechnicianManagement'));
+const Reports = React.lazy(() => import('./components/Reports/Reports'));
+const Categories = React.lazy(() => import('./components/Categories/Categories'));
+const Settings = React.lazy(() => import('./components/Settings/Settings'));
 
 function AppContent() {
   const { user, isLoading } = useAuth();
   const [activeSection, setActiveSection] = useState('dashboard');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -47,7 +52,7 @@ function AppContent() {
   const renderContent = () => {
     switch (activeSection) {
       case 'dashboard':
-        return <Dashboard />;
+                  return <Dashboard setActiveSection={setActiveSection} />;
       case 'tickets':
         return <TicketManagement />;
       case 'users':
@@ -65,17 +70,28 @@ function AppContent() {
     }
   };
 
+  const toggleMobileMenu = () => {
+    setIsMobileMenuOpen(!isMobileMenuOpen);
+  };
+
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-gray-50 dark:bg-gray-900 dark:text-white transition-colors duration-200">
       <Sidebar 
         activeSection={activeSection} 
-        onSectionChange={setActiveSection} 
+        onSectionChange={(section) => {
+          setActiveSection(section);
+          setIsMobileMenuOpen(false);
+        }}
+        mobileMenuOpen={isMobileMenuOpen}
+        closeMobileMenu={toggleMobileMenu}
       />
       <div className="flex-1 flex flex-col overflow-hidden">
-        <Header title={getSectionTitle()} />
+        <Header title={getSectionTitle()} toggleMobileMenu={toggleMobileMenu} />
         <main className="flex-1 overflow-y-auto p-6">
           <div className="animate-fade-in">
-            {renderContent()}
+            <Suspense fallback={<LoadingSpinner />}>
+              {renderContent()}
+            </Suspense>
           </div>
         </main>
       </div>
@@ -83,11 +99,18 @@ function AppContent() {
   );
 }
 
+// Configuração dos providers
+
 function App() {
   return (
     <AuthProvider>
-      <SettingsProvider> {/* <-- 2. Envolver o AppContent */}
-        <AppContent />
+      <SettingsProvider>
+        <ToastProvider>
+          <ThemeProvider>
+            <AppContent />
+            <Toast />
+          </ThemeProvider>
+        </ToastProvider>
       </SettingsProvider>
     </AuthProvider>
   );

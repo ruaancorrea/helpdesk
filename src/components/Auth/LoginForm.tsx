@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { HelpCircle, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useSettings } from '../../hooks/useSettings';
+import { useToast } from '../../hooks/useToast';
 
 export default function LoginForm() {
   const [email, setEmail] = useState('');
@@ -12,6 +13,7 @@ export default function LoginForm() {
 
   const { login } = useAuth();
   const { settings } = useSettings();
+  const { showToast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,6 +24,9 @@ export default function LoginForm() {
     
     if (!success) {
       setError('Email ou senha incorretos');
+      showToast('Email ou senha incorretos', 'error');
+    } else {
+      showToast('Login realizado com sucesso!', 'success');
     }
     
     setIsLoading(false);
@@ -92,14 +97,7 @@ export default function LoginForm() {
             </button>
           </form>
 
-          <div className="mt-8 pt-6 border-t border-gray-200">
-            <div className="text-xs text-gray-500 space-y-1">
-              <p><strong>Contas de teste:</strong></p>
-              <p>Admin: admin@empresa.com / 123456</p>
-              <p>Técnico: joao@empresa.com / 123456</p>
-              <p>Usuário: maria@empresa.com / 123456</p>
-            </div>
-          </div>
+
         </div>
       </div>
     </div>

@@ -7,8 +7,13 @@ import TicketsByCategory from './TicketsByCategory';
 import SLAStatus from './SLAStatus';
 import QuickActions from './QuickActions';
 import { useAuth } from '../../hooks/useAuth';
+import TicketCharts from './TicketCharts';
 
-export default function Dashboard() {
+interface DashboardProps {
+  setActiveSection: (section: string) => void;
+}
+
+export default function Dashboard({ setActiveSection }: DashboardProps) {
   const { user } = useAuth();
   const [stats, setStats] = useState<AppStats | null>(null);
   const [tickets, setTickets] = useState<Ticket[]>([]);
@@ -122,6 +127,21 @@ export default function Dashboard() {
         <QuickActions />
       </div>
 
+      <TicketCharts 
+        ticketsByStatus={[
+          { name: 'Abertos', value: stats.openTickets },
+          { name: 'Em Progresso', value: stats.inProgressTickets },
+          { name: 'Resolvidos', value: stats.resolvedTickets },
+          { name: 'Fechados', value: stats.closedTickets },
+        ]}
+        ticketsByPriority={[
+          { name: 'Baixa', value: stats.ticketsByPriority.low },
+          { name: 'Média', value: stats.ticketsByPriority.medium },
+          { name: 'Alta', value: stats.ticketsByPriority.high },
+          { name: 'Crítica', value: stats.ticketsByPriority.critical },
+        ]}
+      />
+
       <StatsCards 
         stats={user?.role === 'user' ? {
           ...stats,
@@ -141,7 +161,8 @@ export default function Dashboard() {
               tickets
             }
             users={users}
-            onTicketClick={() => {}} // Will be implemented with navigation
+            onTicketClick={() => setActiveSection('tickets')} 
+            onViewAllClick={() => setActiveSection('tickets')}
           />
         </div>
         
