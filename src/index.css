@@ -1,3 +1,8 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Ajuste aqui */
+html {
+  font-size: 80%;
+}

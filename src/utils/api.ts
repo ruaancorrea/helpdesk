@@ -177,3 +177,28 @@ export async function deleteTicket(id: string): Promise<void> {
     throw new Error('Falha ao apagar o chamado');
   }
 }
+
+
+// --- NOVA FUNÇÃO PARA CRIAR USUÁRIOS EM MASSA ---
+export async function bulkCreateUsers(users: any[]): Promise<void> {
+  const response = await fetch(`${API_URL}/users/bulk`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ users }),
+  });
+  if (!response.ok) {
+    throw new Error('Falha ao importar usuários');
+  }
+}
+
+
+
+// --- NOVA FUNÇÃO PARA APAGAR USUÁRIO ---
+export async function deleteUser(id: string): Promise<void> {
+  const response = await fetch(`${API_URL}/users/${id}`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) {
+    throw new Error('Falha ao apagar usuário');
+  }
+}

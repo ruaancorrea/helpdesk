@@ -1,10 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, Search, Edit, User, Mail, Phone, Wrench } from 'lucide-react';
-import { getUsers, createUser, updateUser } from '../../utils/api';
+import { useState, useEffect } from 'react';
+// 1. Importar o ícone de lixo e a função de apagar
+import { Plus, Search, Edit, User, Mail, Phone, Wrench, Trash2 } from 'lucide-react'; 
+import { getUsers, deleteUser } from '../../utils/api'; 
 import { User as UserType } from '../../types';
 import TechnicianForm from './TechnicianForm';
+import { useAuth } from '../../hooks/useAuth'; // Importar para verificar o papel do admin
 
 export default function TechnicianManagement() {
+  const { user: loggedInUser } = useAuth(); // Obter o utilizador logado
   const [technicians, setTechnicians] = useState<UserType[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTechnician, setSelectedTechnician] = useState<UserType | null>(null);
@@ -37,6 +40,20 @@ export default function TechnicianManagement() {
     setSelectedTechnician(technician);
     setShowForm(true);
   };
+  
+  // 2. Adicionar a função de exclusão
+  const handleDelete = async (technicianId: string) => {
+    if (window.confirm('Tem a certeza de que deseja apagar este técnico permanentemente?')) {
+        try {
+            await deleteUser(technicianId); // Reutiliza a mesma função de apagar utilizador
+            alert('Técnico apagado com sucesso.');
+            loadTechnicians(); // Recarrega a lista
+        } catch (error) {
+            console.error('Erro ao apagar técnico:', error);
+            alert('Não foi possível apagar o técnico.');
+        }
+    }
+  };
 
   const handleFormClose = () => {
     setShowForm(false);
@@ -58,7 +75,6 @@ export default function TechnicianManagement() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between space-y-4 lg:space-y-0">
           <div className="flex flex-col sm:flex-row gap-4 flex-1">
@@ -84,7 +100,6 @@ export default function TechnicianManagement() {
         </div>
       </div>
 
-      {/* Technicians Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredTechnicians.map((technician) => (
           <div key={technician.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
@@ -99,7 +114,7 @@ export default function TechnicianManagement() {
                 </div>
               </div>
               
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-1"> 
                 <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">
                   Técnico
                 </span>
@@ -109,6 +124,15 @@ export default function TechnicianManagement() {
                 >
                   <Edit size={16} />
                 </button>
+                {/* 3. Adicionar o botão de apagar */}
+                {loggedInUser?.role === 'admin' && (
+                    <button
+                        onClick={() => handleDelete(technician.id)}
+                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                    >
+                        <Trash2 size={16} />
+                    </button>
+                )}
               </div>
             </div>
 
@@ -150,7 +174,6 @@ export default function TechnicianManagement() {
         )}
       </div>
 
-      {/* Technician Form Modal */}
       {showForm && (
         <TechnicianForm
           technician={selectedTechnician}

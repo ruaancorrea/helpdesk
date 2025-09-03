@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, AlertCircle } from 'lucide-react';
 import { createUser, updateUser } from '../../utils/api';
 import { User } from '../../types';
+import { useAuth } from '../../hooks/useAuth';
 
 interface UserFormProps {
   user?: User | null;
@@ -10,6 +11,7 @@ interface UserFormProps {
 }
 
 export default function UserForm({ user, onClose, onSuccess }: UserFormProps) {
+  const { user: loggedInUser } = useAuth();
   const [formData, setFormData] = useState({
     name: user?.name || '',
     email: user?.email || '',
@@ -17,9 +19,24 @@ export default function UserForm({ user, onClose, onSuccess }: UserFormProps) {
     department: user?.department || '',
     position: user?.position || '',
     phone: user?.phone || '',
+    role: user?.role || 'user', // O papel é 'user' por defeito
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (user) {
+      setFormData({
+        name: user.name || '',
+        email: user.email || '',
+        password: '',
+        department: user.department || '',
+        position: user.position || '',
+        phone: user.phone || '',
+        role: user.role || 'user',
+      });
+    }
+  }, [user]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,20 +45,17 @@ export default function UserForm({ user, onClose, onSuccess }: UserFormProps) {
 
     try {
       if (user) {
-        // Update existing user
         const updateData: any = { ...formData };
         if (!formData.password) {
-          delete updateData.password; // Don't update password if not provided
+          delete updateData.password;
         }
         await updateUser(user.id, updateData);
       } else {
-        // Create new user
         await createUser({
           ...formData,
-          role: 'user'
+          role: formData.role,
         });
       }
-
       onSuccess();
     } catch (err) {
       setError('Erro ao salvar usuário. Tente novamente.');
@@ -154,6 +168,23 @@ export default function UserForm({ user, onClose, onSuccess }: UserFormProps) {
               placeholder="(11) 99999-9999"
             />
           </div>
+
+          {/* CAMPO DE PAPEL (SÓ PARA ADMINS) */}
+          {loggedInUser?.role === 'admin' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Papel</label>
+              <select
+                value={formData.role}
+                // AQUI ESTÁ A CORREÇÃO:
+                onChange={(e) => setFormData(prev => ({ ...prev, role: e.target.value as 'user' | 'admin' | 'technician' }))}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="user">Usuário</option>
+                <option value="admin">Administrador</option>
+                <option value="technician">Técnico</option>
+              </select>
+            </div>
+          )}
 
           <div className="flex items-center justify-end space-x-4 pt-6 border-t border-gray-200">
             <button
